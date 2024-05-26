@@ -25,16 +25,26 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	userHandler := api.NewUserHandler(db.NewMongoUserStore(client, db.DbName))
+	// Handlers initialization
+	var (
+		userHandler  = api.NewUserHandler(db.NewMongoUserStore(client, db.DbName))
+		hotelsStore  = db.NewMongoHotelStore(client)
+		roomStore    = db.NewMongoRoomStore(client, hotelsStore)
+		hotelHandler = api.NewHotelHandler(hotelsStore, roomStore)
+		app          = fiber.New(config)
+		apiV1        = app.Group("/api/v1")
+	)
 
-	app := fiber.New(config)
-	apiV1 := app.Group("/api/v1")
-
+	// User handlers
 	apiV1.Put("user/:id", userHandler.HandlePutUser)
 	apiV1.Delete("user/:id", userHandler.HandleDeleteUser)
 	apiV1.Post("user", userHandler.HandlePostUser)
 	apiV1.Get("/user", userHandler.HandleGetUsers)
 	apiV1.Get("/user/:id", userHandler.HandleGetUser)
+
+	// Hotel handlers
+	apiV1.Get("/hotel", hotelHandler.HandleGetHotels)
+
 	err = app.Listen(*listenAddr)
 	if err != nil {
 		log.Fatal(err)
