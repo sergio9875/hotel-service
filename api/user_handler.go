@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"net/http"
 )
 
 type UserHandler struct {
@@ -75,7 +76,7 @@ func (h *UserHandler) HandleGetUser(c *fiber.Ctx) error {
 	user, err := h.userStore.GetUserByID(c.Context(), id)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return c.JSON(map[string]string{"error": "user not found"})
+			return c.Status(http.StatusNotFound).JSON(map[string]string{"error": "user not found"})
 		}
 		return err
 	}
