@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sergio9875/hotel-service/api"
 	"github.com/sergio9875/hotel-service/api/middleware"
@@ -10,6 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var config = fiber.Config{
@@ -22,10 +25,18 @@ func main() {
 	listenAddr := flag.String("listenAddr", ":4000", "The listen address of the API server")
 	flag.Parse()
 
+	// Mongo client
 	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(db.DbUri))
 	if err != nil {
 		log.Fatal(err)
 	}
+	//MySql client
+	_, err = db.ConnectToMySql(db.MySqlUser, db.MySqlPassword, db.MySqlHost, db.DbName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("MySql connected..")
+
 	// Handlers initialization
 	var (
 		hotelsStore  = db.NewMongoHotelStore(client)
@@ -38,13 +49,15 @@ func main() {
 			Room:    roomStore,
 			Booking: bookingStore,
 		}
-		userHandler  = api.NewUserHandler(userStore)
-		hotelHandler = api.NewHotelHandler(store)
-		authHandler  = api.NewAuthHandler(userStore)
-		roomHandler  = api.NewRoomHandler(store)
-		app          = fiber.New(config)
-		auth         = app.Group("/api")
-		apiV1        = app.Group("/api/v1", middleware.JWTAuthentication(userStore))
+		userHandler    = api.NewUserHandler(userStore)
+		hotelHandler   = api.NewHotelHandler(store)
+		authHandler    = api.NewAuthHandler(userStore)
+		roomHandler    = api.NewRoomHandler(store)
+		bookingHandler = api.NewBookingHandler(store)
+		app            = fiber.New(config)
+		auth           = app.Group("/api")
+		apiV1          = app.Group("/api/v1", middleware.JWTAuthentication(userStore))
+		admin          = apiV1.Group("/admin", middleware.AdminAuth)
 	)
 	// Auth
 	auth.Post("/auth", authHandler.HandleAuthenticate)
@@ -61,8 +74,15 @@ func main() {
 	apiV1.Get("/hotel/:id/rooms", hotelHandler.HandleGetRooms)
 	apiV1.Get("/hotel/:id", hotelHandler.HandleGetHotel)
 
+	// Rooms handlers
 	apiV1.Post("/room/:id/book", roomHandler.HandleBookRoom)
 	apiV1.Get("/room/", roomHandler.HandleGetRooms)
+
+	// Booking handlers
+	apiV1.Get("/booking/:id", bookingHandler.HandleGetBooking)
+
+	// Admin handlers
+	admin.Get("/booking/", bookingHandler.HandleGetBookings)
 
 	err = app.Listen(*listenAddr)
 	if err != nil {
