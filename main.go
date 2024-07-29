@@ -80,6 +80,7 @@ func main() {
 
 	// Booking handlers
 	apiV1.Get("/booking/:id", bookingHandler.HandleGetBooking)
+	apiV1.Get("/booking/:id/cancel", bookingHandler.HandleCancelBooking)
 
 	// Admin handlers
 	admin.Get("/booking/", bookingHandler.HandleGetBookings)
