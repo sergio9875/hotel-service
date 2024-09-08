@@ -90,7 +90,7 @@ func TestAdminGetBookings(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(bookings) != 1 {
-		t.Fatalf("expected 1 booking got %d", len(bookings))
+		t.Fatalf("expected 1+ booking got %d", len(bookings))
 	}
 	have := bookings[0]
 	if have.ID != booking.ID {

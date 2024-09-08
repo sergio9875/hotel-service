@@ -3,14 +3,16 @@ package db
 import (
 	"context"
 	"github.com/sergio9875/hotel-service/types"
+	"os"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type RoomStore interface {
-	InsertRoom(ctx context.Context, room *types.Room) (*types.Room, error)
-	GetRooms(ctx context.Context, m bson.M) ([]*types.Room, error)
+	InsertRoom(context.Context, *types.Room) (*types.Room, error)
+	GetRooms(context.Context, bson.M) ([]*types.Room, error)
 }
 
 type MongoRoomStore struct {
@@ -21,9 +23,10 @@ type MongoRoomStore struct {
 }
 
 func NewMongoRoomStore(client *mongo.Client, hotelStore HotelStore) *MongoRoomStore {
+	dbname := os.Getenv(MongoDBNameEnvName)
 	return &MongoRoomStore{
 		client:     client,
-		coll:       client.Database(DbName).Collection("rooms"),
+		coll:       client.Database(dbname).Collection("rooms"),
 		HotelStore: hotelStore,
 	}
 }
@@ -38,7 +41,6 @@ func (s *MongoRoomStore) GetRooms(ctx context.Context, filter bson.M) ([]*types.
 		return nil, err
 	}
 	return rooms, nil
-
 }
 
 func (s *MongoRoomStore) InsertRoom(ctx context.Context, room *types.Room) (*types.Room, error) {
@@ -47,8 +49,10 @@ func (s *MongoRoomStore) InsertRoom(ctx context.Context, room *types.Room) (*typ
 		return nil, err
 	}
 	room.ID = resp.InsertedID.(primitive.ObjectID)
-	filter := bson.M{"_id": room.HotelID}
-	update := bson.M{"$push": bson.M{"rooms": room.ID}}
+
+	// update the hotel with this room id
+	filter := Map{"_id": room.HotelID}
+	update := Map{"$push": bson.M{"rooms": room.ID}}
 	if err := s.HotelStore.Update(ctx, filter, update); err != nil {
 		return nil, err
 	}

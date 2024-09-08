@@ -2,15 +2,15 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 	"github.com/sergio9875/hotel-service/api"
 	"github.com/sergio9875/hotel-service/db"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
+	"os"
 )
 
 var config = fiber.Config{
@@ -18,20 +18,24 @@ var config = fiber.Config{
 }
 
 func main() {
-	listenAddr := flag.String("listenAddr", ":4000", "The listen address of the API server")
-	flag.Parse()
+	mongoEndpoint := os.Getenv("MONGO_DB_URL")
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoEndpoint))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// Mongo client
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(db.DbUri))
-	if err != nil {
-		log.Fatal(err)
-	}
 	//MySql client
-	_, err = db.ConnectToMySql(db.MySqlUser, db.MySqlPassword, db.MySqlHost, db.DbName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("MySql connected..")
+	//_, err = db.ConnectToMySql(db.MySqlUser, db.MySqlPassword, db.MySqlHost, db.DbName)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//fmt.Println("MySql connected..")
+
+	//Postgres client
+	//postgresDb, err := sql.Open("postgres", db.PostgresConnString)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
 	// Handlers initialization
 	var (
@@ -81,9 +85,16 @@ func main() {
 	// Admin handlers
 	admin.Get("/booking/", bookingHandler.HandleGetBookings)
 
-	err = app.Listen(*listenAddr)
+	listenAddr := os.Getenv("HTTP_LISTEN_ADDRESS")
+	err = app.Listen(listenAddr)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
+}
+
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal(err)
+	}
 }

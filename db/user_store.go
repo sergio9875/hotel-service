@@ -7,11 +7,15 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"log"
+	"os"
 )
 
 type Dropper interface {
 	Drop(ctx context.Context) error
 }
+
+type Map map[string]any
 
 type UserStore interface {
 	Dropper
@@ -21,11 +25,19 @@ type UserStore interface {
 	GetUsers(context.Context) ([]*types.User, error)
 	InsertUser(context.Context, *types.User) (*types.User, error)
 	DeleteUser(context.Context, string) error
-	UpdateUser(ctx context.Context, filter bson.M, update types.UpdateUserParams) error
+	UpdateUser(ctx context.Context, filter Map, update types.UpdateUserParams) error
 }
 type MongoUserStore struct {
 	client *mongo.Client
 	coll   *mongo.Collection
+}
+
+func NewMongoUserStore(client *mongo.Client) *MongoUserStore {
+	dbname := os.Getenv(MongoDBNameEnvName)
+	return &MongoUserStore{
+		client: client,
+		coll:   client.Database(dbname).Collection("users"),
+	}
 }
 
 func (s *MongoUserStore) Drop(ctx context.Context) error {
@@ -36,8 +48,9 @@ func (s *MongoUserStore) Drop(ctx context.Context) error {
 func (s *MongoUserStore) InsertUser(ctx context.Context, user *types.User) (*types.User, error) {
 	res, err := s.coll.InsertOne(ctx, user)
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
+
 	user.ID = res.InsertedID.(primitive.ObjectID)
 	return user, nil
 }
@@ -75,9 +88,14 @@ func (s *MongoUserStore) DeleteUser(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *MongoUserStore) UpdateUser(ctx context.Context, filter bson.M, params types.UpdateUserParams) error {
-	update := bson.M{"$set": params}
-	_, err := s.coll.UpdateOne(ctx, filter, update)
+func (s *MongoUserStore) UpdateUser(ctx context.Context, filter Map, params types.UpdateUserParams) error {
+	oid, err := primitive.ObjectIDFromHex(filter["_id"].(string))
+	if err != nil {
+		return err
+	}
+	filter["_id"] = oid
+	update := bson.M{"$set": params.ToBSON()}
+	_, err = s.coll.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -96,11 +114,4 @@ func (s *MongoUserStore) GetUsers(ctx context.Context) ([]*types.User, error) {
 	}
 	users = append(users)
 	return users, nil
-}
-
-func NewMongoUserStore(client *mongo.Client) *MongoUserStore {
-	return &MongoUserStore{
-		client: client,
-		coll:   client.Database(DbName).Collection("users"),
-	}
 }

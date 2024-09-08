@@ -2,35 +2,38 @@ package api
 
 import (
 	"context"
+	"database/sql"
+	"github.com/joho/godotenv"
 	"github.com/sergio9875/hotel-service/db"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
+	"os"
 	"testing"
 )
 
-const (
-	testDbUri  = "mongodb://localhost:27017"
-	testDbName = "hotel-reservation-test"
-)
-
 type testDb struct {
-	client *mongo.Client
+	client    *mongo.Client
+	sqlClient *sql.DB
 	*db.Store
 }
 
 func (tdb *testDb) teardown(t *testing.T) {
-	if err := tdb.client.Database(db.DbName).Drop(context.TODO()); err != nil {
+	dbname := os.Getenv(db.MongoDBNameEnvName)
+	if err := tdb.client.Database(dbname).Drop(context.TODO()); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func setup(t *testing.T) *testDb {
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(testDbUri))
+	if err := godotenv.Load("../.env"); err != nil {
+		t.Error(err)
+	}
+	dbUri := os.Getenv("MONGO_DB_URL_TEST")
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(dbUri))
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	hotelStore := db.NewMongoHotelStore(client)
 	return &testDb{
 		client: client,
